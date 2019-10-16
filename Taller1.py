@@ -23,17 +23,25 @@ tokens = (
         'mult',
         'pow',
         'divide',
+        'equals',
         'lparen',
+        'lbracket',
         'rparen',
+        'rbracket',
+        'semicolon',
         ) + tuple(reservadas.values())
 
 t_plus = r'\+'
 t_minus = r'-'
 t_mult = r'\*'
 t_pow = r'\^'
-t_divide = r'/'
+t_divide = r'\/'
+t_equals = r'\='
 t_lparen = r'\('
+t_lbracket = r'\['
 t_rparen = r'\)'
+t_rbracket = r'\]'
+t_semicolon = r'\;'
      
 def t_scalar(t):
     r'\d+'
@@ -46,7 +54,7 @@ def t_error(t):
   
 lexer = lex.lex()
 
-lexer.input('1+2^')
+lexer.input('1+2^;]/=')
 
 while 1:
     tok = lexer.token()
