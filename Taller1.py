@@ -10,20 +10,20 @@ variables = {}
 
 reservadas = {
         
-    'if' : 'if',
-    'print' : 'print',
-    'sum' : 'sum',
-    'begin' : 'begin',
-    'end' : 'end',
-    'matrix' : 'matrix', 
-    'scalar' : 'scalar',
-    'then' : 'then',   
+    'IF' : 'if',
+    'PRINT' : 'print',
+    'SUM' : 'sum',
+    'BEGIN' : 'begin',
+    'END' : 'end',
+    'MATRIX' : 'matrix', 
+    'SCALAR' : 'scalar',
+    'THEN' : 'then',   
 }
-
 
 tokens = (
 
     'string',
+    'var',
     'float',
     'plus',
     'minus',
@@ -39,6 +39,13 @@ tokens = (
     'comment',
 
 ) + tuple(reservadas.values())
+
+precedence = (
+    ('right', 'equals'),
+    ('left', 'plus', 'minus'),
+    ('left', 'mult', 'divide'),
+    ('left', 'pow')
+)
 
 t_ignore = r' ' 
 
@@ -68,8 +75,15 @@ def t_scalar(t):
     t.value = int(t.value)
     return t 
 
+def t_var(t):
+    r'[a-zA-Z_][a-zA-Z0-9_]*'
+    t.type = 'var'
+    return t
+
 def t_string(t):
-    r'[a-z0-9]+'
+    #r'\"[A-Za-z0-9]+\"'
+    r'\"((\S+)\s?)+\"'
+    t.value = str(t.value)
     return t
 
 def t_matrix(t):
@@ -79,7 +93,7 @@ def t_matrix(t):
 
 def t_error(t):
     print(f.RED + "ERROR >>> CARÁCTER NO VALIDO")
-    t.lexer.skip(1)
+    t.lexer.skip(100)
     
   
 lexer = lex.lex()
@@ -89,48 +103,66 @@ lexer = lex.lex()
 
 def p_taller(p):
     '''
-    taller : expr
-           | asign
+    taller : assign 
+           | ifp
+           | expr
+           
 
     '''
-    
-    print(p[1])
+
     for x, y in variables.items():
         print(f.BLUE + 'Variable: ' + str(x) + f.YELLOW + ' Valor: ' + str(y))
 
-def p_asign(p):
+def p_assign(p):
     '''
-    asign : string equals expr 
+    assign : var equals expr
     '''
-    if p[3] != '':
-        variables[p[1]] = p[3]
-        p[0] = p[3]
-        lexer.input(str(p[0]))
-        print(lexer.token().type)
+    if(variables.get(p[3]) == None):
+        if(p[3] != '') :  
+            lexer.input(str(p[3]))
+            if(lexer.token().type == 'var'):
+                p_error(p)
+                return
+            variables[p[1]] = p[3]
+            p[0] = p[3]
+    
+    else:
+        variables[p[1]] = variables.get(p[3])
+        p[0] = variables.get(p[3])
 
 
 def p_op(p):
     '''
-    expr : expr pow expr
+    expr : expr plus expr
+         | expr minus expr
          | expr mult expr
          | expr divide expr
-         | expr plus expr
-         | expr minus expr
+         | expr pow expr
 
     '''
-    lexer.input(str(p[1]))
-    tipo1 = lexer.token().type
-    lexer.input(str(p[3]))
-    tipo2 = lexer.token().type
-    if(tipo1 == 'scalar' and tipo2 == 'scalar'):
-        if(p[2] == '^'):
-            p[0] = pow(p[1], p[3])
-        elif(False): pass
-        elif(False): pass
-        elif(False): pass
-        elif(False): pass
+    p[0] = (p[2], p[1], p[3])
+    p[0] = run_p(p[0])
+
+def run_p(p):
+    if(type(p) == tuple):
+        if(p[0] == '+'):
+            return run_p(p[1]) + run_p(p[2])
+        elif(p[0] == '-'):
+            return run_p(p[1]) - run_p(p[2])
+        elif(p[0] == '*'):
+            return run_p(p[1]) * run_p(p[2])
+        elif(p[0] == '/'):
+            return run_p(p[1]) / run_p(p[2])
+        elif(p[0] == '^'):
+            return run_p(p[1])**run_p(p[2])
+
     else:
-        p[0] = (p[2], p[1], p[3])
+        return p
+
+def p_if(p):
+    '''
+    ifp : if lparen rparen then begin assign end
+    '''
 
 def p_expr(p):
     '''
@@ -138,13 +170,14 @@ def p_expr(p):
          | matrix
          | float
          | string
+         | var
 
     '''
     p[0] = p[1] 
 
-def p_error(p):
-    print(f.RED + "ERROR EN EL ANALISIS GRAMATICO")
-
+# def p_error(p):
+#     print(f.RED + "ERROR EN EL ANALISIS GRAMATICO")
+#     p.lexer.skip(100)
 
 parser = yacc.yacc()
 
@@ -155,7 +188,7 @@ while 1:
         break
     parser.parse(s)
 
-#lexer.input('string 55de prueba55')
+# lexer.input('"este es un mensaje"')
 
 # while 1:
 #     tok = lexer.token()
