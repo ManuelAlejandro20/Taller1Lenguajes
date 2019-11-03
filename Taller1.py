@@ -8,16 +8,16 @@ c_init(autoreset=True)
 
 variables = {}
 
-reservadas = {
-        
-    'IF' : 'if',
-    'PRINT' : 'print',
-    'SUM' : 'sum',
-    'BEGIN' : 'begin',
-    'END' : 'end',
-    'MATRIX' : 'matrix', 
-    'SCALAR' : 'scalar',
-    'THEN' : 'then',   
+reserved = {
+#representacion : que palabra reservada representa       
+    'if' : 'if',
+    'print' : 'print',
+    'sum' : 'sum',
+    'begin' : 'begin',
+    'end' : 'end',
+    'matrix' : 'matrix', 
+    'scalar' : 'scalar',
+    'then' : 'then',   
 }
 
 tokens = (
@@ -38,16 +38,17 @@ tokens = (
     'semicolon',
     'comment',
 
-) + tuple(reservadas.values())
+) + tuple(reserved.values())
 
 precedence = (
     ('right', 'equals'),
     ('left', 'plus', 'minus'),
     ('left', 'mult', 'divide'),
-    ('left', 'pow')
+    ('left', 'pow'),
 )
 
 t_ignore = r' ' 
+t_ignore_comment = r'\//'
 
 t_plus = r'\+'
 t_minus = r'-'
@@ -61,10 +62,6 @@ t_rparen = r'\)'
 t_rbracket = r'\]'
 t_semicolon = r'\;'
 
-def t_comment(t):
-    r'\//'
-    return
-
 def t_float(t):
     r'\d+\.\d*(e-?\d+)?'
     t.value = float(t.value)
@@ -77,7 +74,7 @@ def t_scalar(t):
 
 def t_var(t):
     r'[a-zA-Z_][a-zA-Z0-9_]*'
-    t.type = 'var'
+    t.type = reserved.get(t.value,'var')
     return t
 
 def t_string(t):
@@ -103,8 +100,8 @@ lexer = lex.lex()
 
 def p_taller(p):
     '''
-    taller : assign 
-           | ifp
+    taller : ifp
+           | assign
            | expr
            
 
@@ -161,8 +158,9 @@ def run_p(p):
 
 def p_if(p):
     '''
-    ifp : if lparen rparen then begin assign end
+    ifp : if lparen rparen then begin end
     '''
+
 
 def p_expr(p):
     '''
@@ -175,11 +173,11 @@ def p_expr(p):
     '''
     p[0] = p[1] 
 
-# def p_error(p):
-#     print(f.RED + "ERROR EN EL ANALISIS GRAMATICO")
-#     p.lexer.skip(100)
+def p_error(p):
+    print(f.RED + "ERROR EN EL ANALISIS GRAMATICO")
+    p.lexer.skip(100)
 
-parser = yacc.yacc()
+parser = yacc.yacc(debug=True)
 
 while 1:
     try:
