@@ -8,7 +8,6 @@ import logging
 c_init(autoreset=True)
 
 variables = {}
-variables2 = {}
 
 reserved = {
 #representacion : que palabra reservada representa       
@@ -191,7 +190,6 @@ def p_exprvar2(p):
         elif(ntype == 'float'):
             p[0] = float(-var)
         else:
-            print('sss')
             p[0] = '-'+str(p[2])
     else:
         p[0] = p[1]
@@ -221,7 +219,6 @@ def run_type(p):
         return str(lexer.token().type)
 
 def run_p(p):
-    print(p)
     if(type(p) == tuple):
         if(p[0] == '+'):
             return run_p(p[1]) + run_p(p[2])
@@ -314,9 +311,9 @@ def p_expr(p):
 def p_print(p):
     '''
     imprimir : print lparen expr rparen
+             | print lparen exprvar rparen
     '''
-    lexer.input(str(p[3]))
-    ntype = str(lexer.token().type)
+    ntype = run_type(p[3])
     if(ntype == 'var'):
         if(p[3] in variables):
             print(variables.get(p[3]))
