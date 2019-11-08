@@ -43,7 +43,7 @@ tokens = (
 ) + tuple(reserved.values())
 
 precedence = (
-    ('right', 'equals'),
+    ('left', 'equals'),
     ('left', 'plus', 'minus'),
     ('left', 'mult', 'divide'),
     ('left', 'pow'),
@@ -65,12 +65,14 @@ t_rbracket = r'\]'
 t_semicolon = r'\;'
 
 def t_float(t):
-    r'\-?\d+\.\d*(e-?\d+)?'
+    #r'\-?\d+\.\d*(e-?\d+)?'
+    r'\d+\.\d*(e-?\d+)?'
     t.value = float(t.value)
     return t
      
 def t_scalar(t):
-    r'\-?\d+'
+    #r'\-?\d+'
+    r'\d+'
     t.value = int(t.value)
     return t 
 
@@ -115,7 +117,8 @@ def p_taller(p):
 
 def p_assign(p):
     '''
-    assign : var equals expr 
+    assign : var equals expr
+           | var equals exprvar 
     '''
     #Busco si la variable ya existe, si no...
     if(variables.get(p[3]) == None):
@@ -140,6 +143,59 @@ def p_assign(p):
         p[0] = (p[1], var1, variables.get(p[3]))
 
 
+def p_exprvar(p):
+    '''
+    exprvar : exprvar plus exprvar
+            | exprvar minus exprvar
+            | exprvar mult exprvar
+            | exprvar divide exprvar
+            | exprvar pow exprvar
+            | exprvar plus expr
+            | exprvar minus expr
+            | exprvar mult expr
+            | exprvar divide expr
+            | exprvar pow expr
+            | expr plus exprvar
+            | expr minus exprvar
+            | expr mult exprvar
+            | expr divide exprvar
+            | expr pow exprvar
+    '''
+    if(variables.get(p[1]) == None):
+        if(variables.get(p[3]) == None):
+            p[0] = (p[2], p[1], p[3])
+        else:    
+            p[0] = (p[2], p[1], variables.get(p[3]))
+    elif(variables.get(p[3]) == None):
+        if(variables.get(p[1]) == None):
+            p[0] = (p[2], p[1], p[3])
+        else:
+            p[0] = (p[2], variables.get(p[1]), p[3])
+    else: 
+        p[0] = (p[2], variables.get(p[1]), variables.get(p[3]))
+    p[0] = run_p(p[0])
+
+def p_exprvar2(p):
+    '''
+    exprvar : var
+            | minus var
+    '''
+    if(len(p) == 3):
+        ntype = run_type(variables.get(p[2]))
+        var = variables.get(p[2])
+        if(var == None):
+            p[0] = 'aaaaaaaaaaaaaa'
+            return
+        if(ntype == 'scalar'):
+            p[0] = int(-var)
+        elif(ntype == 'float'):
+            p[0] = float(-var)
+        else:
+            print('sss')
+            p[0] = '-'+str(p[2])
+    else:
+        p[0] = p[1]
+
 def p_op(p):
     '''
     expr : expr plus expr
@@ -147,24 +203,25 @@ def p_op(p):
          | expr mult expr
          | expr divide expr
          | expr pow expr
-
     '''
-    # lexer.input(str(p[1]))
-    # ntype = str(lexer.token().type)
-    # lexer.input(str(p[3]))
-    # ntype2 = str(lexer.token().type)
-    # if(ntype == 'var' and ntype2 == 'var'):
-    #     print('operaciones entre variables')
-        # if(p[1] in variables and p[3] in variables):
-        #     p[1] = variables.get(p[1])
-        #     p[3] = variables.get(p[3])
-        # else:
-        #     print('variables no disponibels')        
+
     p[0] = (p[2], p[1], p[3])
     p[0] = run_p(p[0])
 
 
+def run_type(p):
+    if(type(p) == tuple):
+        lexer.input(str(p[0]))
+        type1 = str(lexer.token().type)
+        lexer.input(str(p[1])) 
+        type2 = str(lexer.token().type)
+        return type1, type2
+    else:
+        lexer.input(str(p))
+        return str(lexer.token().type)
+
 def run_p(p):
+    print(p)
     if(type(p) == tuple):
         if(p[0] == '+'):
             return run_p(p[1]) + run_p(p[2])
@@ -183,31 +240,41 @@ def run_p(p):
 def p_if(p):
     '''
     ifp : if lparen boolexpr rparen then begin assign end
+        | if lparen minus boolexpr rparen then begin assign end
     '''
 
-    lexer.input(str(p[3]))
-    ntype = str(lexer.token().type)
-
-    if(ntype == 'scalar'):
-        num = int(p[3])
-    elif(ntype == 'float'):
-        num = float(p[3])
-    else:
-        num = ''
-
-    try:
-        if(num > 0):
-            print('true')
+    if(len(p) == 10):
+        ntype = run_type(p[4])
+        if(ntype == 'scalar'):
+            num = int(-p[4])
         else:
-            print('false')
+            num = float(-p[4])
+    else:
+        try:
+            if(p[3] > 0):
+                ntype = run_type(p[3])
+                if(ntype == 'scalar'):
+                    num = int(p[3])
+                else:
+                    num = float(p[3])
+            else:
+                num = p[3]
+        except:
+            p_error(p)
+            num = -1
+    try:
+        if(num < 0):
+            n = 8
+            if(len(p) == 9):
+                n -= 1
             #Se esta asignando el valor de otra variable a la variable
             #Se esta modificar la valor de una variable ya existente
-            if(len(p[7]) == 3):
-                tup = p[7]
+            if(len(p[n]) == 3):
+                tup = p[n]
                 variables[tup[0]] = tup[1]
             #Se esta intentando crear una variable nueva dentro del if
             else:
-                variables.pop(p[7])
+                variables.pop(p[n])
                 
     except:
         p_error(p)
@@ -216,8 +283,13 @@ def p_boolexpr(p):
     '''
     boolexpr : scalar
              | float
+             | var
     '''
-    p[0] = p[1]
+    if(variables.get(p[1]) != None):
+        p[0] = variables.get(p[1])
+
+    else:
+        p[0] = p[1]
 
 
 def p_expr(p):
@@ -226,19 +298,18 @@ def p_expr(p):
          | matrix
          | float
          | string
-         | var
+         | minus scalar
+         | minus float
 
     '''
-    # lexer.input(str(p[1]))
-
-    # a = str(lexer.token().type)
-    # print(a)
-    # if(a == "scalar"):
-    #     p[0] = int(p[1])
-    # elif(a == "float"):
-    #     p[0] = float(p[1])
-    # else:
-    p[0] = p[1]
+    if(len(p) == 3):
+        ntype = run_type(p[2])
+        if(ntype == 'scalar'):
+            p[0] = int(-p[2])
+        else:
+            p[0] = float(-p[2])
+    else:
+        p[0] = p[1]
 
 def p_print(p):
     '''
@@ -257,9 +328,9 @@ def p_print(p):
     else:
         print(p[3])
 
-# def p_error(p):
-#     print(f.RED + "ERROR EN EL ANALISIS GRAMATICO")
-#     p.lexer.skip(100)
+def p_error(p):
+    print(f.RED + "ERROR EN EL ANALISIS GRAMATICO")
+    p.lexer.skip(100)
 
 parser = yacc.yacc(debug=True)
 
