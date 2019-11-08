@@ -3,10 +3,12 @@ from colorama import init as c_init, Fore as f
 import ply.lex as lex
 import ply.yacc as yacc
 import sys
+import logging
 
 c_init(autoreset=True)
 
 variables = {}
+variables2 = {}
 
 reserved = {
 #representacion : que palabra reservada representa       
@@ -63,12 +65,12 @@ t_rbracket = r'\]'
 t_semicolon = r'\;'
 
 def t_float(t):
-    r'\d+\.\d*(e-?\d+)?'
+    r'\-?\d+\.\d*(e-?\d+)?'
     t.value = float(t.value)
     return t
      
 def t_scalar(t):
-    r'\d+'
+    r'\-?\d+'
     t.value = int(t.value)
     return t 
 
@@ -100,9 +102,10 @@ lexer = lex.lex()
 
 def p_taller(p):
     '''
-    taller : ifp
-           | assign
+    taller : assign
+           | ifp
            | expr
+           | imprimir
            
 
     '''
@@ -112,20 +115,29 @@ def p_taller(p):
 
 def p_assign(p):
     '''
-    assign : var equals expr
+    assign : var equals expr 
     '''
+    #Busco si la variable ya existe, si no...
     if(variables.get(p[3]) == None):
+        #Si es diferente de vacio
         if(p[3] != '') :  
             lexer.input(str(p[3]))
+            #Si es una variable y entra en este if quiere decir que la variable no esta dentro del diccionario osea error
             if(lexer.token().type == 'var'):
                 p_error(p)
                 return
+            if(p[1] in variables):
+                p[0] = (p[1], variables.get(p[1]) , p[3])
+            else:
+                p[0] = p[1]
             variables[p[1]] = p[3]
-            p[0] = p[3]
+            
     
+    #Si ya existe se buscara el valor de la variable y este sera el nuevo valor de la variable izquierda
     else:
+        var1 = variables.get(p[1])
         variables[p[1]] = variables.get(p[3])
-        p[0] = variables.get(p[3])
+        p[0] = (p[1], var1, variables.get(p[3]))
 
 
 def p_op(p):
@@ -137,8 +149,20 @@ def p_op(p):
          | expr pow expr
 
     '''
+    # lexer.input(str(p[1]))
+    # ntype = str(lexer.token().type)
+    # lexer.input(str(p[3]))
+    # ntype2 = str(lexer.token().type)
+    # if(ntype == 'var' and ntype2 == 'var'):
+    #     print('operaciones entre variables')
+        # if(p[1] in variables and p[3] in variables):
+        #     p[1] = variables.get(p[1])
+        #     p[3] = variables.get(p[3])
+        # else:
+        #     print('variables no disponibels')        
     p[0] = (p[2], p[1], p[3])
     p[0] = run_p(p[0])
+
 
 def run_p(p):
     if(type(p) == tuple):
@@ -158,8 +182,42 @@ def run_p(p):
 
 def p_if(p):
     '''
-    ifp : if lparen rparen then begin end
+    ifp : if lparen boolexpr rparen then begin assign end
     '''
+
+    lexer.input(str(p[3]))
+    ntype = str(lexer.token().type)
+
+    if(ntype == 'scalar'):
+        num = int(p[3])
+    elif(ntype == 'float'):
+        num = float(p[3])
+    else:
+        num = ''
+
+    try:
+        if(num > 0):
+            print('true')
+        else:
+            print('false')
+            #Se esta asignando el valor de otra variable a la variable
+            #Se esta modificar la valor de una variable ya existente
+            if(len(p[7]) == 3):
+                tup = p[7]
+                variables[tup[0]] = tup[1]
+            #Se esta intentando crear una variable nueva dentro del if
+            else:
+                variables.pop(p[7])
+                
+    except:
+        p_error(p)
+
+def p_boolexpr(p):
+    '''
+    boolexpr : scalar
+             | float
+    '''
+    p[0] = p[1]
 
 
 def p_expr(p):
@@ -171,11 +229,37 @@ def p_expr(p):
          | var
 
     '''
-    p[0] = p[1] 
+    # lexer.input(str(p[1]))
 
-def p_error(p):
-    print(f.RED + "ERROR EN EL ANALISIS GRAMATICO")
-    p.lexer.skip(100)
+    # a = str(lexer.token().type)
+    # print(a)
+    # if(a == "scalar"):
+    #     p[0] = int(p[1])
+    # elif(a == "float"):
+    #     p[0] = float(p[1])
+    # else:
+    p[0] = p[1]
+
+def p_print(p):
+    '''
+    imprimir : print lparen expr rparen
+    '''
+    lexer.input(str(p[3]))
+    ntype = str(lexer.token().type)
+    if(ntype == 'var'):
+        if(p[3] in variables):
+            print(variables.get(p[3]))
+        else:
+            p_error(p)
+    elif(ntype == 'string'):
+        p2 = p[3].replace('"', '')  
+        print(p2)
+    else:
+        print(p[3])
+
+# def p_error(p):
+#     print(f.RED + "ERROR EN EL ANALISIS GRAMATICO")
+#     p.lexer.skip(100)
 
 parser = yacc.yacc(debug=True)
 
@@ -184,7 +268,9 @@ while 1:
         s = input('>>> ')
     except EOFError:
         break
-    parser.parse(s)
+    log = logging.getLogger()
+    parser.parse(s,debug=log)
+    #parser.parse(s)
 
 # lexer.input('"este es un mensaje"')
 
