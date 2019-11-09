@@ -107,6 +107,7 @@ def p_taller(p):
     taller : assign
            | ifp
            | expr
+           | exprmat
            | imprimir
            
 
@@ -120,6 +121,7 @@ def p_assign(p):
     assign : var equals expr
            | var equals exprvar 
            | var equals func
+           | var equals exprmat
     '''
     #Busco si la variable ya existe, si no...
     if(variables.get(p[3]) == None):
@@ -196,6 +198,41 @@ def p_exprvar2(p):
     else:
         p[0] = p[1]
 
+def p_exprmat(p):
+    '''
+    exprmat : exprmat plus exprmat
+            | exprmat minus exprmat
+            | exprmat mult exprmat
+            | exprmat divide exprmat
+            | exprmat pow exprmat
+            | expr plus exprmat
+            | expr minus exprmat
+            | expr mult exprmat
+            | exprmat divide expr
+            | exprmat pow expr
+    '''
+    if(isinstance(p[1],n.matrix) == False):
+        matriz1 = convertMatrix(p[1])
+    else:
+        matriz1 = p[1]
+    if(isinstance(p[3],n.matrix) == False): 
+        matriz2 = convertMatrix(p[3])
+    else:
+        matriz2 = p[3]
+    p[0] = (p[2], matriz1, matriz2)
+    p[0] = runMatriz_p(p[0])
+    print(p[0])
+
+def p_exprmat2(p):
+    '''
+    exprmat : matrix
+            | minus matrix
+    '''
+    if(len(p) == 3):
+        p[0] = p[2]
+    p[0] = p[1]
+
+
 def p_op(p):
     '''
     expr : expr plus expr
@@ -220,8 +257,24 @@ def run_type(p):
         lexer.input(str(p))
         return str(lexer.token().type)
 
+def runMatriz_p(p):
+    if(type(p) == tuple):
+        if(p[0] == '+'):
+            return n.add(runMatriz_p(p[1]), runMatriz_p(p[2]))
+        elif(p[0] == '-'):
+            return n.subtract(runMatriz_p(p[1]), runMatriz_p(p[2]))
+        elif(p[0] == '*'):
+            return n.multiply(runMatriz_p(p[1]), runMatriz_p(p[2]))
+        elif(p[0] == '/'):
+            return n.divide(runMatriz_p(p[1]), runMatriz_p(p[2]))
+        elif(p[0] == '^'):
+            return 
+    else:
+        return p
+
 def run_p(p):
     if(type(p) == tuple):
+        print(p)()
         try:
             if(p[0] == '+'):
                 return run_p(p[1]) + run_p(p[2])
@@ -296,7 +349,6 @@ def p_boolexpr(p):
 def p_expr(p):
     '''
     expr : scalar
-         | matrix
          | float
          | string
          | minus scalar
@@ -333,6 +385,7 @@ def p_sum(p):
     '''
     func : sum lparen expr rparen
          | sum lparen exprvar rparen
+         | sum lparen exprmat rparen
 
     '''
     ntype = run_type(p[3])
@@ -340,12 +393,13 @@ def p_sum(p):
         p[0] = variables.get(p[3])
     elif(ntype == 'matrix'):
         matriz = convertMatrix(p[3])
-        print(matriz)
         p[0] = matriz.sum()
     else:
         p[0] = p[3]
 
 def convertMatrix(p):
+    if(isinstance(p, int)):
+        return p
     lista = p.replace('[', '')
     lista = lista.replace(']', '')
     lista = lista.split(';')
@@ -363,9 +417,9 @@ def convertMatrix(p):
                 j.append(0)
     return n.matrix(lista2)
 
-def p_error(p):
-    print(f.RED + "ERROR EN EL ANALISIS GRAMATICO")
-    p.lexer.skip(100)
+# def p_error(p):
+#     print(f.RED + "ERROR EN EL ANALISIS GRAMATICO")
+#     p.lexer.skip(100)
 
 parser = yacc.yacc(debug=True)
 
@@ -376,7 +430,7 @@ while 1:
         break
     log = logging.getLogger()
     parser.parse(s,debug=log)
-    
+
 # lexer.input('"este es un mensaje"')
 
 # while 1:
