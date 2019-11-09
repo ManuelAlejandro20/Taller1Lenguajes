@@ -1,5 +1,6 @@
 #Nombres: Manuel Trigo y Luciano Larama 
 from colorama import init as c_init, Fore as f
+import numpy as n
 import ply.lex as lex
 import ply.yacc as yacc
 import sys
@@ -118,6 +119,7 @@ def p_assign(p):
     '''
     assign : var equals expr
            | var equals exprvar 
+           | var equals func
     '''
     #Busco si la variable ya existe, si no...
     if(variables.get(p[3]) == None):
@@ -220,17 +222,19 @@ def run_type(p):
 
 def run_p(p):
     if(type(p) == tuple):
-        if(p[0] == '+'):
-            return run_p(p[1]) + run_p(p[2])
-        elif(p[0] == '-'):
-            return run_p(p[1]) - run_p(p[2])
-        elif(p[0] == '*'):
-            return run_p(p[1]) * run_p(p[2])
-        elif(p[0] == '/'):
-            return run_p(p[1]) / run_p(p[2])
-        elif(p[0] == '^'):
-            return run_p(p[1])**run_p(p[2])
-
+        try:
+            if(p[0] == '+'):
+                return run_p(p[1]) + run_p(p[2])
+            elif(p[0] == '-'):
+                return run_p(p[1]) - run_p(p[2])
+            elif(p[0] == '*'):
+                return run_p(p[1]) * run_p(p[2])
+            elif(p[0] == '/'):
+                return run_p(p[1]) / run_p(p[2])
+            elif(p[0] == '^'):
+                return run_p(p[1])**run_p(p[2])
+        except TypeError:
+            return str(p[1]) + str(p[0]) + str(p[2])
     else:
         return p
 
@@ -325,6 +329,40 @@ def p_print(p):
     else:
         print(p[3])
 
+def p_sum(p):
+    '''
+    func : sum lparen expr rparen
+         | sum lparen exprvar rparen
+
+    '''
+    ntype = run_type(p[3])
+    if(ntype == 'var'):
+        p[0] = variables.get(p[3])
+    elif(ntype == 'matrix'):
+        matriz = convertMatrix(p[3])
+        print(matriz)
+        p[0] = matriz.sum()
+    else:
+        p[0] = p[3]
+
+def convertMatrix(p):
+    lista = p.replace('[', '')
+    lista = lista.replace(']', '')
+    lista = lista.split(';')
+    lista2 = []
+    listamax = []
+    for i in lista:
+        i2 = i.split(',')
+        lista2.append(list(map(int, i2)))
+        listamax.append(len(i2))
+    max1 = max(listamax) 
+    for j in lista2:
+        largo = len(j)
+        if(largo != max1):
+            for i in range(max1 - largo):
+                j.append(0)
+    return n.matrix(lista2)
+
 def p_error(p):
     print(f.RED + "ERROR EN EL ANALISIS GRAMATICO")
     p.lexer.skip(100)
@@ -338,8 +376,7 @@ while 1:
         break
     log = logging.getLogger()
     parser.parse(s,debug=log)
-    #parser.parse(s)
-
+    
 # lexer.input('"este es un mensaje"')
 
 # while 1:
