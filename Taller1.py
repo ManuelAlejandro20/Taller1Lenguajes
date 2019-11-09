@@ -1,6 +1,7 @@
 #Nombres: Manuel Trigo y Luciano Larama 
 from colorama import init as c_init, Fore as f
 import numpy as n
+import math as mt
 import ply.lex as lex
 import ply.yacc as yacc
 import sys
@@ -123,6 +124,7 @@ def p_assign(p):
            | var equals func
            | var equals exprmat
     '''
+
     #Busco si la variable ya existe, si no...
     if(variables.get(p[3]) == None):
         #Si es diferente de vacio
@@ -208,6 +210,11 @@ def p_exprmat(p):
             | expr plus exprmat
             | expr minus exprmat
             | expr mult exprmat
+            | expr divide exprmat
+            | expr pow exprmat
+            | exprmat plus expr
+            | exprmat minus expr
+            | exprmat mult expr
             | exprmat divide expr
             | exprmat pow expr
     '''
@@ -221,6 +228,7 @@ def p_exprmat(p):
         matriz2 = p[3]
     p[0] = (p[2], matriz1, matriz2)
     p[0] = runMatriz_p(p[0])
+    p[0] = matrixConvert(p[0])
     print(p[0])
 
 def p_exprmat2(p):
@@ -229,8 +237,11 @@ def p_exprmat2(p):
             | minus matrix
     '''
     if(len(p) == 3):
-        p[0] = p[2]
-    p[0] = p[1]
+        matriz = convertMatrix(p[2])
+        matriz = n.dot(-1,matriz)
+        p[0] =  matrixConvert(matriz)
+    else:
+        p[0] = p[1]
 
 
 def p_op(p):
@@ -264,17 +275,17 @@ def runMatriz_p(p):
         elif(p[0] == '-'):
             return n.subtract(runMatriz_p(p[1]), runMatriz_p(p[2]))
         elif(p[0] == '*'):
-            return n.multiply(runMatriz_p(p[1]), runMatriz_p(p[2]))
+            return n.dot(runMatriz_p(p[1]), runMatriz_p(p[2]))
         elif(p[0] == '/'):
             return n.divide(runMatriz_p(p[1]), runMatriz_p(p[2]))
         elif(p[0] == '^'):
-            return 
+            return n.power(runMatriz_p(p[1]), runMatriz_p(p[2]))
     else:
         return p
 
 def run_p(p):
     if(type(p) == tuple):
-        print(p)()
+        print(p)
         try:
             if(p[0] == '+'):
                 return run_p(p[1]) + run_p(p[2])
@@ -368,6 +379,7 @@ def p_print(p):
     '''
     imprimir : print lparen expr rparen
              | print lparen exprvar rparen
+             | print lparen exprmat rparen
     '''
     ntype = run_type(p[3])
     if(ntype == 'var'):
@@ -391,6 +403,10 @@ def p_sum(p):
     ntype = run_type(p[3])
     if(ntype == 'var'):
         p[0] = variables.get(p[3])
+        ntype2 = run_type(p[0])
+        if(ntype2 == 'matrix'):
+            matriz = convertMatrix(p[0])
+            p[0] = matriz.sum()    
     elif(ntype == 'matrix'):
         matriz = convertMatrix(p[3])
         p[0] = matriz.sum()
@@ -398,7 +414,7 @@ def p_sum(p):
         p[0] = p[3]
 
 def convertMatrix(p):
-    if(isinstance(p, int)):
+    if(isinstance(p, int) or isinstance(p, float)):
         return p
     lista = p.replace('[', '')
     lista = lista.replace(']', '')
@@ -407,7 +423,10 @@ def convertMatrix(p):
     listamax = []
     for i in lista:
         i2 = i.split(',')
-        lista2.append(list(map(int, i2)))
+        try:
+            lista2.append(list(map(int, i2)))
+        except ValueError:
+            lista2.append(list(map(float, i2)))
         listamax.append(len(i2))
     max1 = max(listamax) 
     for j in lista2:
@@ -417,9 +436,24 @@ def convertMatrix(p):
                 j.append(0)
     return n.matrix(lista2)
 
-# def p_error(p):
-#     print(f.RED + "ERROR EN EL ANALISIS GRAMATICO")
-#     p.lexer.skip(100)
+def matrixConvert(p):
+    matrizStr = '['
+    lista = p.tolist()
+    for i in lista:
+        for j in i:
+            if(isinstance(j, float)):
+                j = mt.ceil(j)
+                j = int(j)
+            matrizStr = matrizStr + str(j) + ','
+        matrizStr = matrizStr[:-1]
+        matrizStr += ';'
+    matrizStr = matrizStr[:-1]
+    matrizStr += ']'
+    return matrizStr
+
+def p_error(p):
+    print(f.RED + "ERROR EN EL ANALISIS GRAMATICO")
+    p.lexer.skip(100)
 
 parser = yacc.yacc(debug=True)
 
