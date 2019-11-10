@@ -217,7 +217,29 @@ def p_exprmat(p):
             | exprmat mult expr
             | exprmat divide expr
             | exprmat pow expr
+            | exprvar plus exprmat
+            | exprvar minus exprmat
+            | exprvar mult exprmat
+            | exprvar divide exprmat
+            | exprvar pow exprmat
+            | exprmat plus exprvar
+            | exprmat minus exprvar
+            | exprmat mult exprvar
+            | exprmat divide exprvar
+            | exprmat pow exprvar
     '''
+
+    if(variables.get(p[1]) == None):
+        if(variables.get(p[3]) == None):
+            p[3] = p[3]
+        else:    
+            p[3] =  variables.get(p[3])
+    elif(variables.get(p[3]) == None):
+        if(variables.get(p[1]) == None):
+            p[1] = p[1]
+        else:
+            p[1] = variables.get(p[1])
+
     if(isinstance(p[1],n.matrix) == False):
         matriz1 = convertMatrix(p[1])
     else:
