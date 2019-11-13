@@ -35,23 +35,25 @@ tokens = (
     'divide',
     'equals',
     'lparen',
-    'lbracket',
+    # 'lbracket',
     'rparen',
-    'rbracket',
-    'semicolon',
-    'comment',
+    #'rbracket',
+    # 'semicolon',
+    # 'comment',
 
 ) + tuple(reserved.values())
 
 precedence = (
+    ('right', 'lparen', 'rparen'),
     ('left', 'equals'),
     ('left', 'plus', 'minus'),
     ('right', 'mult', 'divide'),
     ('left', 'pow'),
+    ('left', 'if'),
 )
 
 t_ignore = r' ' 
-t_ignore_comment = r'\//'
+# t_ignore_comment = r'\//'
 
 t_plus = r'\+'
 t_minus = r'-'
@@ -60,10 +62,10 @@ t_pow = r'\^'
 t_divide = r'\/'
 t_equals = r'\='
 t_lparen = r'\('
-t_lbracket = r'\['
+# t_lbracket = r'\['
 t_rparen = r'\)'
-t_rbracket = r'\]'
-t_semicolon = r'\;'
+# t_rbracket = r'\]'
+# t_semicolon = r'\;'
 
 def t_float(t):
     #r'\-?\d+\.\d*(e-?\d+)?'
@@ -84,9 +86,9 @@ def t_var(t):
 
 def t_string(t):
     #r'\"[A-Za-z0-9]+\"'
-    r'\"((\S+)\s?)+\"'
+    #r'\"((\S+)\s?)+\"'
     #r'"([^"\n]|(\\"))*"$'
-    #r'\"((\S+[^"])\s?[^"])+\"'
+    r'\"((\S+[^"])\s?[^"])+\"'
     t.value = str(t.value)
     return t
 
@@ -108,8 +110,10 @@ lexer = lex.lex()
 def p_taller(p):
     '''
     taller : assign
+           | ifp
            | expr
            | imprimir
+           | func
 
     '''
 
@@ -120,15 +124,16 @@ def p_assign(p):
     '''
     assign : var equals expr
            | var equals func
+           | var equals st
     '''
 
     #Busco si la variable ya existe, si no...
     if(variables.get(p[3]) == None):
         #Si es diferente de vacio
         if(p[3] != '') :  
-            lexer.input(str(p[3]))
+            ntype = run_type(p[3])
             #Si es una variable y entra en este if quiere decir que la variable no esta dentro del diccionario osea error
-            if(lexer.token().type == 'var'):
+            if(ntype == 'var'):
                 p_error(p)
                 return
             if(p[1] in variables):
@@ -166,17 +171,6 @@ def p_op(p):
         if(variables.get(p[3]) != None):
             elemento2 = variables.get(p[3])
 
-    ntype = run_type(elemento1)
-    ntype2 = run_type(elemento2)
-
-    if(ntype == 'string' or ntype2 == 'string'):
-        if(p[2] == '+'):
-            p[0] = str(elemento1) + str(elemento2)
-            p[0] = p[0].replace('"', '')
-            p[0] = '"' + p[0]  + '"'
-        else:
-            p_error(p)
-        return
     if(isinstance(p[1],n.matrix) == False):
         elemento1 = convertMatrix(elemento1)
     if(isinstance(p[3],n.matrix) == False): 
@@ -203,31 +197,65 @@ def run_type(p):
 
 def run_p(p):
     if(type(p) == tuple):
+        print(p)
         if(isinstance(p[1], n.matrix) or isinstance(p[2], n.matrix)):
             if(p[0] == '+'):
-                return n.add(runMatriz_p(p[1]), runMatriz_p(p[2]))
+                return n.add(run_p(p[1]), run_p(p[2]))
             elif(p[0] == '-'):
-                return n.subtract(runMatriz_p(p[1]), runMatriz_p(p[2]))
+                return n.subtract(run_p(p[1]), run_p(p[2]))
             elif(p[0] == '*'):
-                return n.dot(runMatriz_p(p[1]), runMatriz_p(p[2]))
+                return n.dot(run_p(p[1]), run_p(p[2]))
             elif(p[0] == '/'):
-                return n.divide(runMatriz_p(p[1]), runMatriz_p(p[2]))
+                return n.divide(run_p(p[1]), run_p(p[2]))
             elif(p[0] == '^'):
-                return n.power(runMatriz_p(p[1]), runMatriz_p(p[2]))
+                return n.power(run_p(p[1]), run_p(p[2]))
         else:
-            if(p[0] == '+'):
-                return run_p(p[1]) + run_p(p[2])
-            elif(p[0] == '-'):
-                return run_p(p[1]) - run_p(p[2])
-            elif(p[0] == '*'):
-                return run_p(p[1]) * run_p(p[2])
-            elif(p[0] == '/'):
-                return run_p(p[1]) / run_p(p[2])
-            elif(p[0] == '^'):
-                return run_p(p[1])**run_p(p[2])
+            try:
+                if(p[0] == '+'):
+                    return run_p(p[1]) + run_p(p[2])
+                elif(p[0] == '-'):
+                    return run_p(p[1]) - run_p(p[2])
+                elif(p[0] == '*'):
+                    return run_p(p[1]) * run_p(p[2])
+                elif(p[0] == '/'):
+                    return run_p(p[1]) / run_p(p[2])
+                elif(p[0] == '^'):
+                    return run_p(p[1])**run_p(p[2])
+            except TypeError:
+                return str(p[1]) + str(p[0]) + str(p[2])
     else:
         return p
 
+def p_st(p):
+    '''
+    st : st plus st
+       | st plus expr
+       | expr plus st
+    '''
+
+    elemento1 = p[1] 
+    elemento2 = p[3]
+
+    if(variables.get(p[1]) != None and variables.get(p[3]) != None):
+        elemento1 = variables.get(p[1])
+        elemento2 = variables.get(p[3])
+    else:
+        if(variables.get(p[1]) != None):
+            elemento1 = variables.get(p[1])
+                  
+        if(variables.get(p[3]) != None):
+            elemento2 = variables.get(p[3])
+
+    p[0] = str(elemento1) + str(elemento2)
+    p[0] = p[0].replace('"', '')
+    p[0] = '"' + p[0]  + '"'
+
+def p_st2(p):
+    '''
+    st : string
+    '''
+
+    p[0] = p[1]
 
 def p_expr(p):
     '''
@@ -236,7 +264,7 @@ def p_expr(p):
          | var
          | matrix
          | minus var
-         | minus scalar
+         | minus scalar 
          | minus float
          | minus matrix
 
@@ -248,6 +276,7 @@ def retExpr(p):
         ntype = run_type(p[2])
         if(ntype == 'scalar'):
             return int(-p[2])
+            #return int(p[2])
         elif(ntype == 'float'):
             return float(-p[2])
         elif(ntype == 'matrix'):
@@ -261,14 +290,110 @@ def retExpr(p):
     else:
         return p[1]
 
+def p_if(p):
+    # '''
+    # ifp : if lparen boolexpr rparen then begin e
+    # '''
+
+    '''
+    ifp : lparen boolexpr rparen
+        | if ifp then ifp
+        | begin e %prec minus
+    '''
+    #print('an' + str(list(p)))
+    try:
+        if(p[3] == ')'):
+            if(type(p[2]) == tuple):
+                tup = p[2]
+                if(tup[1] not in variables):
+                    p[0] = False
+                    p.lexer.skip(2)
+                elif(variables.get(tup[1]) > 0):
+                    p[0] = False
+                    p.lexer.skip(2)
+                return
+            try:
+                if(p[2] < 0):
+                    p[0] = False
+                    p.lexer.skip(2)
+            except:
+                if(p[2] not in variables):
+                    p[0] = False
+                    p.lexer.skip(2)
+                elif(variables.get(p[2]) < 0):
+                    p[0] = False
+                    p.lexer.skip(2)
+            
+    except IndexError:
+        pass
+    #print('dps' + str(list(p)))
+    # 
+
+    # if(type(expr) == tuple):
+    #     if(expr[1] > 0):
+    #         print('Verdadero')
+    #     else:    
+    #         print('Falso')
+    # else:
+    #     if(expr > 0):
+    #         print('Verdadero')
+    #     else:    
+    #         print('Falso')
+
+def p_expr3(p):
+    '''
+    e : assign e %prec minus
+      | imprimir e
+      | end
+    '''
+
+    #print(list(p))
+
+    p[0] = p[1]
+
+
+def boole(p):
+    ntype = run_type(p[2])
+    if(type(ntype) == tuple):
+        tup = p[2]
+        if(ntype[1] == 'var'):
+            if(tup[1] not in variables):
+                p_error(p)
+                return -1
+        var1 = retExpr((p[0], '-', tup[1]))
+        return ('-', var1)
+    if(ntype == 'var'):
+        if(p[3] not in variables):
+            p_error(p)
+            return -1
+        var1 = retExpr((p[0], variables.get(p[2])))
+        return var1
+    else:
+        var1 = retExpr((p[0], p[2]))
+        return var1
+
+def p_boolexpr(p):
+    '''
+    boolexpr : scalar
+             | float
+             | var
+             | minus scalar
+             | minus float
+             | minus var 
+    '''
+    if(p[1] == '-'):
+        p[0] = (p[1], p[2])
+    else:
+        p[0] = p[1]
+   
 def p_print(p):
     '''
     imprimir : print lparen expr rparen
+             | print lparen st rparen
 
     '''
 
     retPrint(p)
-
 
 def retPrint(p):
     ntype = run_type(p[3])
@@ -286,7 +411,7 @@ def retPrint(p):
 def p_sum(p):
     '''
     func : sum lparen expr rparen
-
+    
     '''
     ntype = run_type(p[3])
     if(ntype == 'var'):
@@ -345,10 +470,14 @@ def matrixConvert(p):
     return matrizStr
 
 # def p_error(p):
+#     print(p)
 #     print(f.RED + "ERROR EN EL ANALISIS GRAMATICO")
 #     p.lexer.skip(100)
 
-parser = yacc.yacc(debug=True)
+def p_error(p):
+    p.lexer.skip(100)
+
+parser = yacc.yacc()
 
 while 1:
     try:
@@ -356,7 +485,11 @@ while 1:
     except EOFError:
         break
     log = logging.getLogger()
-    parser.parse(s,debug=log)
+    #parser.parse(s)
+    try:
+        parser.parse(s)
+    except AttributeError:
+        pass
 
 # lexer.input('tring"')
 
